@@ -1,4 +1,5 @@
 import pytest
+from botocore.exceptions import ClientError
 from moto import mock_aws
 
 from app.storage import Storage, job_key
@@ -51,3 +52,22 @@ def test_delete_prefix_removes_all_objects_under_it(storage):
     with pytest.raises(KeyError):
         storage.head("users/u1/jobs/j1/a")
     assert storage.head("users/u1/jobs/j2/c") == 1
+
+
+def _client_error(code, op):
+    return ClientError({"Error": {"Code": code, "Message": code}}, op)
+
+
+def test_non_missing_client_errors_propagate(storage, monkeypatch):
+    def boom(**kwargs):
+        raise _client_error("SlowDown", "GetObject")
+
+    monkeypatch.setattr(storage.client, "get_object", boom)
+    with pytest.raises(ClientError):
+        storage.get_bytes("k")
+    with pytest.raises(ClientError):
+        list(storage.stream("k"))
+
+    monkeypatch.setattr(storage.client, "head_object", boom)
+    with pytest.raises(ClientError):
+        storage.head("k")
