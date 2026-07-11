@@ -108,6 +108,32 @@ def test_upload_over_size_cap_413(auth_client):
         settings.max_upload_mb = original
 
 
+def test_upload_huge_body_rejected_before_parse(auth_client):
+    import json as _json
+
+    from app.config import settings
+
+    client = auth_client()
+    original = settings.max_upload_mb
+    settings.max_upload_mb = 1
+    try:
+        # Over cap + 64 MB allowance -> rejected from Content-Length alone,
+        # before the multipart body is parsed ("Upload exceeds", not "Video").
+        big = b"x" * (65 * 1024 * 1024 + 1024)
+        r = client.post(
+            "/api/jobs",
+            data={"persons": _json.dumps([{"name": "A"}])},
+            files=[
+                ("video", ("c.mp4", big, "video/mp4")),
+                ("photos_0", ("p.jpg", b"x", "image/jpeg")),
+            ],
+        )
+        assert r.status_code == 413
+        assert r.json()["detail"].startswith("Upload exceeds")
+    finally:
+        settings.max_upload_mb = original
+
+
 def test_cancel_processing_returns_cancelling(auth_client, session_factory):
     client = auth_client()
     job_id = create_job(client)["job_id"]

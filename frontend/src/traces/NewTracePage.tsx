@@ -6,6 +6,7 @@ import type { CreateJobResponse } from "../lib/types";
 
 const VIDEO_EXTENSIONS = [".mp4", ".mov", ".avi", ".mkv", ".webm"];
 const MAX_VIDEO_MB = 500;
+// Keep in sync with PERSON_COLORS in backend/app/routes_jobs.py
 const PERSON_COLORS = ["#e05252", "#4f9cf0", "#4fc07a", "#e0a34f", "#a06fe0", "#e05c9c"];
 
 interface PersonDraft {

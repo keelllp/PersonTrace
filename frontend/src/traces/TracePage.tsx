@@ -7,7 +7,7 @@ import { ResultsView } from "./ResultsView";
 
 export function TracePage() {
   const { id } = useParams<{ id: string }>();
-  const { data: job, isLoading } = useQuery({
+  const { data: job, isLoading, error } = useQuery({
     queryKey: ["job", id],
     queryFn: () => api.get<JobDetail>(`/api/jobs/${id}`),
     retry: (failureCount, error) =>
@@ -19,7 +19,14 @@ export function TracePage() {
   });
 
   if (isLoading) return <p className="text-dim">Loading trace…</p>;
-  if (!job) return <p className="text-dim">Trace not found.</p>;
+  if (!job)
+    return (
+      <p className="text-dim">
+        {error && !(error instanceof ApiError && error.status === 404)
+          ? "Couldn't load this trace — check your connection and try again."
+          : "Trace not found."}
+      </p>
+    );
 
   if (job.status === "queued" || job.status === "processing")
     return <ProcessingView job={job} />;
