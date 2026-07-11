@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -75,6 +75,8 @@ def create_app(storage=None, processor=None, photo_validator=None, spa_dist=None
         # Registered after all API routers so /api/* routes win.
         @app.get("/{path:path}", include_in_schema=False)
         def spa(path: str):
+            if path.startswith("api/"):
+                raise HTTPException(status_code=404, detail="Not found")
             return FileResponse(dist / "index.html")
 
     return app

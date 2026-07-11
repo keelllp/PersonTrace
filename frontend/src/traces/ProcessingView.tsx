@@ -53,11 +53,16 @@ export function ProcessingView({ job }: { job: JobDetail }) {
 
       <button
         onClick={() => cancel.mutate()}
-        disabled={cancel.isPending}
-        className="rounded-md border border-line px-4 py-2 text-sm text-dim hover:text-danger hover:border-danger/50"
+        disabled={cancel.isPending || cancel.isSuccess}
+        className="rounded-md border border-line px-4 py-2 text-sm text-dim hover:text-danger hover:border-danger/50 disabled:opacity-50"
       >
-        Cancel trace
+        {cancel.isSuccess ? "Cancelling…" : "Cancel trace"}
       </button>
+      {cancel.isError && (
+        <p className="text-dim text-sm">
+          Couldn't cancel — the trace may have just finished.
+        </p>
+      )}
     </div>
   );
 }
