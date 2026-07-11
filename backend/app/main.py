@@ -7,11 +7,19 @@ from . import auth, routes_jobs, routes_media
 from .jobs import JobQueue, recover_interrupted_jobs
 
 
-def _pipeline_unavailable(job_id, cancel_check):
-    raise RuntimeError("Processing pipeline is not installed")
+def _default_processor(job_id, cancel_check):
+    from .pipeline.runner import run_pipeline
+
+    run_pipeline(job_id, cancel_check)
 
 
-def create_app(storage=None, processor=None) -> FastAPI:
+def _default_photo_validator(data: bytes) -> bool:
+    from .pipeline.ml import get_face_engine
+
+    return get_face_engine().validate_photo_bytes(data)
+
+
+def create_app(storage=None, processor=None, photo_validator=None) -> FastAPI:
     built_from_settings = storage is None
     if built_from_settings:
         from .storage import Storage
@@ -32,8 +40,8 @@ def create_app(storage=None, processor=None) -> FastAPI:
 
     app = FastAPI(title="PersonTrace API", lifespan=lifespan)
     app.state.storage = storage
-    app.state.job_queue = JobQueue(processor or _pipeline_unavailable)
-    app.state.photo_validator = lambda data: True
+    app.state.job_queue = JobQueue(processor or _default_processor)
+    app.state.photo_validator = photo_validator or _default_photo_validator
 
     app.include_router(auth.router)
     app.include_router(routes_jobs.router)
