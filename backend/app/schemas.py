@@ -20,6 +20,13 @@ class UserOut(BaseModel):
     email: str
 
 
+class PersonSummary(BaseModel):
+    id: str
+    name: str
+    color: str
+    photo_url: str | None
+
+
 class JobListItem(BaseModel):
     id: str
     video_filename: str
@@ -27,7 +34,8 @@ class JobListItem(BaseModel):
     stage: str | None
     progress_pct: float
     created_at: datetime
-    person_names: list[str]
+    duration_s: float | None
+    persons: list[PersonSummary]
 
 
 class JobDetail(BaseModel):

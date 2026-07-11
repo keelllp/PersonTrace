@@ -48,3 +48,22 @@ def test_register_password_over_72_chars_422(client):
         "/api/auth/register", json={"email": "a@b.com", "password": "x" * 73}
     )
     assert r.status_code == 422
+
+
+def test_email_case_insensitive(client):
+    r = client.post(
+        "/api/auth/register", json={"email": "Mixed@Case.com", "password": "secret123"}
+    )
+    assert r.status_code == 201
+    assert r.json()["email"] == "mixed@case.com"
+    # duplicate under different casing rejected
+    r = client.post(
+        "/api/auth/register", json={"email": "MIXED@case.com", "password": "secret123"}
+    )
+    assert r.status_code == 409
+    # login works with any casing
+    client.post("/api/auth/logout")
+    r = client.post(
+        "/api/auth/login", json={"email": "mIxEd@cAsE.com", "password": "secret123"}
+    )
+    assert r.status_code == 200
