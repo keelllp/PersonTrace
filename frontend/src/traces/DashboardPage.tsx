@@ -55,7 +55,7 @@ export function DashboardPage() {
         {jobs.map((job) => (
           <li
             key={job.id}
-            className="bg-panel border border-line rounded-lg p-4 flex items-center gap-4 hover:border-dim/50 transition-colors duration-150"
+            className="bg-panel border border-line rounded-lg p-4 flex flex-wrap items-center gap-4 hover:border-dim/50 transition-colors duration-150"
           >
             <PersonAvatars persons={job.persons} />
             <div className="min-w-0 flex-1">
@@ -72,26 +72,28 @@ export function DashboardPage() {
                 {job.persons.map((p) => p.name).join(", ")}
               </p>
             </div>
-            {(job.status === "processing" || job.status === "queued") && (
-              <span className="tc text-xs text-dim">{Math.round(job.progress_pct)}%</span>
-            )}
-            <StatusChip status={job.status} stage={job.stage} />
-            <button
-              onClick={() => {
-                if (confirm(`Delete trace "${job.video_filename}"? This removes its video, photos, and results.`))
-                  deleteJob.mutate(job.id);
-              }}
-              disabled={job.status === "processing"}
-              title={
-                job.status === "processing"
-                  ? "Cancel the trace before deleting it"
-                  : undefined
-              }
-              className="text-dim hover:text-danger text-sm disabled:opacity-40 disabled:hover:text-dim"
-              aria-label={`Delete trace ${job.video_filename}`}
-            >
-              Delete
-            </button>
+            <div className="flex w-full items-center justify-end gap-4 sm:w-auto">
+              {(job.status === "processing" || job.status === "queued") && (
+                <span className="tc text-xs text-dim">{Math.round(job.progress_pct)}%</span>
+              )}
+              <StatusChip status={job.status} stage={job.stage} />
+              <button
+                onClick={() => {
+                  if (confirm(`Delete trace "${job.video_filename}"? This removes its video, photos, and results.`))
+                    deleteJob.mutate(job.id);
+                }}
+                disabled={job.status === "processing"}
+                title={
+                  job.status === "processing"
+                    ? "Cancel the trace before deleting it"
+                    : undefined
+                }
+                className="text-dim hover:text-danger text-sm disabled:opacity-40 disabled:hover:text-dim"
+                aria-label={`Delete trace ${job.video_filename}`}
+              >
+                Delete
+              </button>
+            </div>
           </li>
         ))}
       </ul>

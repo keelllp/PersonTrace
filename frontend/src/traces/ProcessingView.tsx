@@ -23,9 +23,9 @@ export function ProcessingView({ job }: { job: JobDetail }) {
         </p>
       </div>
 
-      <ol className="flex gap-2">
+      <ol className="grid grid-cols-3 gap-2 sm:flex">
         {STAGES.map((stage, i) => (
-          <li key={stage} className="flex-1">
+          <li key={stage} className="sm:flex-1">
             <div
               className={`h-1.5 rounded-full ${
                 i < currentIndex
