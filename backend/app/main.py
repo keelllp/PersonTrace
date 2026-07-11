@@ -35,6 +35,18 @@ def create_app(storage=None, processor=None, photo_validator=None) -> FastAPI:
                 logging.getLogger(__name__).warning(
                     "Marked %d interrupted job(s) as failed", recovered
                 )
+
+            import threading
+
+            def _warm_face_engine():
+                try:
+                    from .pipeline.ml import get_face_engine
+
+                    get_face_engine()
+                except Exception:
+                    logging.getLogger(__name__).exception("Face engine warm-up failed")
+
+            threading.Thread(target=_warm_face_engine, daemon=True).start()
         yield
         app.state.job_queue.shutdown()
 

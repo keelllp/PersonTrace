@@ -235,3 +235,23 @@ def test_mid_render_failure_leaves_no_partial_sightings(session_factory, tmp_pat
 
     with session_factory() as db:
         assert db.query(Sighting).count() == 0, "partial sightings leaked"
+
+
+def test_cancelled_job_cleans_workdir(pipeline_env, session_factory):
+    import glob
+    import os
+    import tempfile
+
+    storage, job_id, _, models = pipeline_env
+    state = {"count": 0}
+
+    def cancel_during_detect():
+        state["count"] += 1
+        return state["count"] > 3  # probe(2) + gallery(1) pass; cancel at first detect tick
+
+    with pytest.raises(JobCancelled):
+        run_pipeline(job_id, cancel_during_detect, storage=storage,
+                     session_factory=session_factory, models=models)
+
+    leftovers = glob.glob(os.path.join(tempfile.gettempdir(), f"persontrace_{job_id}_*"))
+    assert leftovers == [], f"workdir leaked: {leftovers}"

@@ -2,6 +2,8 @@
 importing app modules never loads torch/onnxruntime. FaceEngine and
 BodyEmbedder are process-wide singletons (expensive to load); PersonDetector
 is created fresh per video because ByteTrack state is per-stream."""
+import threading
+
 import numpy as np
 
 from .config import (
@@ -108,17 +110,20 @@ class BodyEmbedder:
 
 _face_engine: FaceEngine | None = None
 _body_embedder: BodyEmbedder | None = None
+_load_lock = threading.Lock()
 
 
 def get_face_engine() -> FaceEngine:
     global _face_engine
-    if _face_engine is None:
-        _face_engine = FaceEngine()
-    return _face_engine
+    with _load_lock:
+        if _face_engine is None:
+            _face_engine = FaceEngine()
+        return _face_engine
 
 
 def get_body_embedder() -> BodyEmbedder:
     global _body_embedder
-    if _body_embedder is None:
-        _body_embedder = BodyEmbedder()
-    return _body_embedder
+    with _load_lock:
+        if _body_embedder is None:
+            _body_embedder = BodyEmbedder()
+        return _body_embedder
