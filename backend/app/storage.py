@@ -7,6 +7,13 @@ from botocore.exceptions import ClientError
 from .config import settings
 
 
+_MISSING_CODES = {"NoSuchKey", "NoSuchBucket", "404", "NotFound"}
+
+
+def _is_missing(e: ClientError) -> bool:
+    return e.response.get("Error", {}).get("Code") in _MISSING_CODES
+
+
 def job_key(user_id: str, job_id: str, *parts: str) -> str:
     return "/".join(["users", user_id, "jobs", job_id, *parts])
 
@@ -35,7 +42,9 @@ class Storage:
     def ensure_bucket(self) -> None:
         try:
             self.client.head_bucket(Bucket=self.bucket)
-        except ClientError:
+        except ClientError as e:
+            if not _is_missing(e):
+                raise
             self.client.create_bucket(Bucket=self.bucket)
 
     def put_bytes(self, key: str, data: bytes, content_type: str | None = None) -> None:
@@ -46,14 +55,18 @@ class Storage:
         try:
             resp = self.client.get_object(Bucket=self.bucket, Key=key)
         except ClientError as e:
-            raise KeyError(key) from e
+            if _is_missing(e):
+                raise KeyError(key) from e
+            raise
         return resp["Body"].read()
 
     def head(self, key: str) -> int:
         try:
             resp = self.client.head_object(Bucket=self.bucket, Key=key)
         except ClientError as e:
-            raise KeyError(key) from e
+            if _is_missing(e):
+                raise KeyError(key) from e
+            raise
         return int(resp["ContentLength"])
 
     def stream(
@@ -69,7 +82,9 @@ class Storage:
         try:
             resp = self.client.get_object(**kwargs)
         except ClientError as e:
-            raise KeyError(key) from e
+            if _is_missing(e):
+                raise KeyError(key) from e
+            raise
         yield from resp["Body"].iter_chunks(chunk_size)
 
     def delete_prefix(self, prefix: str) -> None:
