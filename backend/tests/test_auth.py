@@ -41,3 +41,10 @@ def test_login_then_logout_clears_access(client):
 
 def test_me_unauthenticated_401(client):
     assert client.get("/api/auth/me").status_code == 401
+
+
+def test_register_password_over_72_chars_422(client):
+    r = client.post(
+        "/api/auth/register", json={"email": "a@b.com", "password": "x" * 73}
+    )
+    assert r.status_code == 422
