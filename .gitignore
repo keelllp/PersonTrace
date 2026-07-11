@@ -24,6 +24,10 @@ data/
 *.onnx
 *.pt
 
+# Local smoke-test media
+backend/e2e_*.mp4
+backend/e2e_*.jpg
+
 # Env & secrets
 .env
 .env.*
