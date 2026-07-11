@@ -11,6 +11,36 @@ from .storage import job_key
 router = APIRouter(prefix="/api/media", tags=["media"])
 
 _RANGE_RE = re.compile(r"bytes=(\d+)-(\d*)$")
+_SUFFIX_RANGE_RE = re.compile(r"bytes=-(\d+)$")
+
+
+def _parse_range(header: str, size: int) -> tuple[int, int] | None:
+    """Return (start, end) for a supported satisfiable range.
+
+    Returns None when the header is unsupported/malformed (caller serves 200).
+    Raises HTTPException(416) when the range is parseable but unsatisfiable.
+    """
+    header = header.strip()
+    unsatisfiable = HTTPException(
+        status_code=416,
+        detail="Range not satisfiable",
+        headers={"Content-Range": f"bytes */{size}"},
+    )
+    m = _RANGE_RE.match(header)
+    if m:
+        start = int(m.group(1))
+        end = int(m.group(2)) if m.group(2) else size - 1
+        end = min(end, size - 1)
+        if start >= size or start > end:
+            raise unsatisfiable
+        return start, end
+    m = _SUFFIX_RANGE_RE.match(header)
+    if m:
+        n = int(m.group(1))
+        if n == 0:
+            raise unsatisfiable
+        return max(0, size - n), size - 1
+    return None
 
 
 @router.get("/{job_id}/{path:path}")
@@ -30,19 +60,9 @@ def get_media(
     base_headers = {"Accept-Ranges": "bytes"}
 
     range_header = request.headers.get("range")
-    if range_header:
-        m = _RANGE_RE.match(range_header.strip())
-        if m is None:
-            raise HTTPException(status_code=416, detail="Malformed Range header")
-        start = int(m.group(1))
-        end = int(m.group(2)) if m.group(2) else size - 1
-        end = min(end, size - 1)
-        if start >= size or start > end:
-            raise HTTPException(
-                status_code=416,
-                detail="Range not satisfiable",
-                headers={"Content-Range": f"bytes */{size}"},
-            )
+    byte_range = _parse_range(range_header, size) if range_header else None
+    if byte_range is not None:
+        start, end = byte_range
         return StreamingResponse(
             storage.stream(key, start=start, end=end),
             status_code=206,
