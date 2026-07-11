@@ -111,7 +111,9 @@ async def create_job(
 
     try:
         job.video_key = job_key(user.id, job.id, f"video{video_ext}")
-        storage.put_fileobj(job.video_key, video.file, content_type=video.content_type)
+        await run_in_threadpool(
+            storage.put_fileobj, job.video_key, video.file, video.content_type
+        )
 
         warnings: list[str] = []
         for i, (name, photos) in enumerate(validated):
@@ -127,7 +129,9 @@ async def create_job(
                 ext = os.path.splitext(photo.filename or "")[1].lower()
                 data = await photo.read()
                 key = job_key(user.id, job.id, f"persons/{person.id}/photo_{n}{ext}")
-                storage.put_bytes(key, data, content_type=photo.content_type)
+                await run_in_threadpool(
+                    storage.put_bytes, key, data, photo.content_type
+                )
                 keys.append(key)
                 if not await run_in_threadpool(validator, data):
                     warnings.append(f"No face detected in photo {n + 1} of {name}")
