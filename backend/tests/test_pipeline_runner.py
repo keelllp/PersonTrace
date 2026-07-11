@@ -148,3 +148,90 @@ def test_pipeline_below_threshold_yields_no_sightings(pipeline_env, session_fact
         assert person.face_gallery_ok is False
         assert person.body_gallery_ok is True  # photo still yielded a body crop
         assert db.query(Sighting).filter_by(person_id=person_id).all() == []
+
+
+VEC_A = unit(21)
+VEC_B = unit(22)
+
+
+class TwoTrackDetector:
+    """Two tracks with different crop widths so fakes can tell them apart."""
+
+    def track(self, frame):
+        return [
+            (1, (10.0, 10.0, 70.0, 110.0), 0.9),   # width 60 -> person A
+            (2, (100.0, 10.0, 180.0, 110.0), 0.9),  # width 80 -> person B
+        ]
+
+    def detect(self, image):
+        h, w = image.shape[:2]
+        return [((0.0, 0.0, float(w), float(h)), 0.9)]
+
+
+class WidthKeyedFace:
+    """Maps image width to a fixed identity vector (photos: 200/240 px,
+    video crops: 60/80 px)."""
+
+    _by_width = {200: VEC_A, 60: VEC_A, 240: VEC_B, 80: VEC_B}
+
+    def best_embedding(self, bgr):
+        vec = self._by_width.get(bgr.shape[1])
+        return None if vec is None else vec.copy()
+
+    def faces(self, bgr):
+        emb = self.best_embedding(bgr)
+        return [] if emb is None else [((0.0, 0.0, 50.0, 50.0), 0.99, emb)]
+
+
+class FailOnLaterScreenshots(FakeStorage):
+    def __init__(self, allowed_screenshot_puts: int):
+        super().__init__()
+        self._remaining = allowed_screenshot_puts
+
+    def put_bytes(self, key, data, content_type=None):
+        if "screenshots/" in key:
+            if self._remaining <= 0:
+                raise RuntimeError("simulated storage failure")
+            self._remaining -= 1
+        super().put_bytes(key, data, content_type)
+
+
+def test_mid_render_failure_leaves_no_partial_sightings(session_factory, tmp_path):
+    storage = FailOnLaterScreenshots(allowed_screenshot_puts=2)  # person 1 ok, person 2 fails
+    video_bytes = make_test_video(tmp_path / "clip.mp4", seconds=2.0).read_bytes()
+
+    import cv2
+
+    with session_factory() as db:
+        user = User(email="p2@test.com", password_hash="x")
+        job = Job(user=user, video_key="", video_filename="clip.mp4",
+                  status="processing")
+        db.add(user)
+        db.flush()
+        job.video_key = job_key(user.id, job.id, "video.mp4")
+        person_ids = []
+        for name, width in (("A", 200), ("B", 240)):
+            person = Person(job_id=job.id, name=name, color="#e05252", photo_keys=[])
+            db.add(person)
+            db.flush()
+            key = job_key(user.id, job.id, f"persons/{person.id}/photo_0.jpg")
+            person.photo_keys = [key]
+            person_ids.append((person.id, key, width))
+        db.commit()
+        job_id, user_id = job.id, user.id
+
+    storage.put_bytes(job_key(user_id, job_id, "video.mp4"), video_bytes)
+    for _pid, key, width in person_ids:
+        photo = np.full((300, width, 3), 128, dtype=np.uint8)
+        ok, jpg = cv2.imencode(".jpg", photo)
+        storage.put_bytes(key, jpg.tobytes())
+
+    models = PipelineModels(
+        detector=TwoTrackDetector(), face=WidthKeyedFace(), body=FakeBody()
+    )
+    with pytest.raises(RuntimeError, match="simulated storage failure"):
+        run_pipeline(job_id, lambda: False, storage=storage,
+                     session_factory=session_factory, models=models)
+
+    with session_factory() as db:
+        assert db.query(Sighting).count() == 0, "partial sightings leaked"
