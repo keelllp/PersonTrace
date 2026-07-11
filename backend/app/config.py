@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-production-minimum-32-bytes!"
     jwt_expires_hours: int = 72
     cookie_name: str = "pt_session"
+    max_upload_mb: int = 500
 
 
 settings = Settings()

@@ -70,14 +70,53 @@ def test_list_and_get_scoped_to_owner(auth_client, client):
     c = auth_client(email="owner@test.com")
     job_id = create_job(c)["job_id"]
 
-    assert [j["id"] for j in c.get("/api/jobs").json()] == [job_id]
-    assert c.get(f"/api/jobs/{job_id}").status_code == 200
+    listing = c.get("/api/jobs").json()
+    assert [j["id"] for j in listing] == [job_id]
+    person = listing[0]["persons"][0]
+    assert person["name"] == "Person0"
+    assert person["color"].startswith("#")
+    assert person["photo_url"].startswith(f"/api/media/{job_id}/persons/")
+    assert "duration_s" in listing[0]
 
     c.post("/api/auth/logout")
     c.post("/api/auth/register", json={"email": "other@test.com", "password": "secret123"})
     assert c.get("/api/jobs").json() == []
     assert c.get(f"/api/jobs/{job_id}").status_code == 404
     assert c.delete(f"/api/jobs/{job_id}").status_code == 404
+
+
+def test_upload_over_size_cap_413(auth_client):
+    import json as _json
+
+    from app.config import settings
+
+    client = auth_client()
+    original = settings.max_upload_mb
+    settings.max_upload_mb = 1
+    try:
+        big = b"x" * (1024 * 1024 + 1)
+        r = client.post(
+            "/api/jobs",
+            data={"persons": _json.dumps([{"name": "A"}])},
+            files=[
+                ("video", ("c.mp4", big, "video/mp4")),
+                ("photos_0", ("p.jpg", b"x", "image/jpeg")),
+            ],
+        )
+        assert r.status_code == 413
+    finally:
+        settings.max_upload_mb = original
+
+
+def test_cancel_processing_returns_cancelling(auth_client, session_factory):
+    client = auth_client()
+    job_id = create_job(client)["job_id"]
+    with session_factory() as db:
+        db.get(Job, job_id).status = "processing"
+        db.commit()
+    r = client.post(f"/api/jobs/{job_id}/cancel")
+    assert r.status_code == 200
+    assert r.json()["status"] == "cancelling"
 
 
 def test_results_409_until_done_then_returns_sightings(auth_client, session_factory):

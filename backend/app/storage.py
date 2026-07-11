@@ -51,6 +51,12 @@ class Storage:
         extra = {"ContentType": content_type} if content_type else {}
         self.client.put_object(Bucket=self.bucket, Key=key, Body=data, **extra)
 
+    def put_fileobj(self, key: str, fileobj, content_type: str | None = None) -> None:
+        extra = {"ContentType": content_type} if content_type else {}
+        self.client.upload_fileobj(
+            fileobj, self.bucket, key, ExtraArgs=extra if extra else None
+        )
+
     def get_bytes(self, key: str) -> bytes:
         try:
             resp = self.client.get_object(Bucket=self.bucket, Key=key)
