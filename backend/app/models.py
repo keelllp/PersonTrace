@@ -34,7 +34,9 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
     video_key: Mapped[str] = mapped_column(String(512))
     video_filename: Mapped[str] = mapped_column(String(255))
     duration_s: Mapped[float | None] = mapped_column(Float, default=None)
@@ -60,7 +62,9 @@ class Person(Base):
     __tablename__ = "persons"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
-    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), index=True)
+    job_id: Mapped[str] = mapped_column(
+        ForeignKey("jobs.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(120))
     color: Mapped[str] = mapped_column(String(9))
     photo_keys: Mapped[list] = mapped_column(JSON, default=list)
@@ -77,7 +81,9 @@ class Sighting(Base):
     __tablename__ = "sightings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    person_id: Mapped[str] = mapped_column(ForeignKey("persons.id"), index=True)
+    person_id: Mapped[str] = mapped_column(
+        ForeignKey("persons.id", ondelete="CASCADE"), index=True
+    )
     start_s: Mapped[float] = mapped_column(Float)
     end_s: Mapped[float] = mapped_column(Float)
     confidence: Mapped[float] = mapped_column(Float)

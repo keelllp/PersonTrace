@@ -35,7 +35,9 @@ def app(session_factory, fake_storage, processor_calls):
     def processor(job_id, cancel_check):
         processor_calls.append(job_id)
 
-    application = create_app(storage=fake_storage, processor=processor)
+    application = create_app(
+        storage=fake_storage, processor=processor, photo_validator=lambda data: True
+    )
     application.state.job_queue._session_factory = session_factory
 
     def override_get_db():
