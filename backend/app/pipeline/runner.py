@@ -142,6 +142,9 @@ def run_pipeline(
                 if not crop.size:
                     continue
                 original_box = tuple(v * scale for v in box)
+                # crop is downscaled while the box is in original coords; the
+                # resulting score mixes scales but the scale factor is constant
+                # per video, so crop RANKING (all we use) is unaffected.
                 store.add(track_id, time_s, crop, original_box)
             if n % 10 == 0:
                 progress("detect", n / sampled_total)
@@ -175,6 +178,7 @@ def run_pipeline(
         progress("match", 1.0)
 
         # ---- Stage 6: render ------------------------------------------------
+        pending_sightings: list[Sighting] = []
         by_person: dict[str, list] = {}
         tracklet_by_id = {t.track_id: t for t in tracklets}
         for track_id, match in matches.items():
@@ -220,7 +224,7 @@ def run_pipeline(
                 storage.put_bytes(thumbnail_key, thumb_path.read_bytes(), "image/jpeg")
 
                 x1, y1, x2, y2 = shot.box
-                db.add(
+                pending_sightings.append(
                     Sighting(
                         person_id=person_id,
                         start_s=round(start_s, 2),
@@ -239,6 +243,7 @@ def run_pipeline(
                     )
                 )
             progress("render", (pi + 1) / max(len(by_person), 1))
+        db.add_all(pending_sightings)
         job.stage = "render"
         db.commit()
     except VideoProbeError as exc:
