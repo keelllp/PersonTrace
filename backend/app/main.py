@@ -1,10 +1,15 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from . import auth, routes_jobs, routes_media
 from .jobs import JobQueue, recover_interrupted_jobs
+
+_DEFAULT_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
 def _default_processor(job_id, cancel_check):
@@ -19,7 +24,7 @@ def _default_photo_validator(data: bytes) -> bool:
     return get_face_engine().validate_photo_bytes(data)
 
 
-def create_app(storage=None, processor=None, photo_validator=None) -> FastAPI:
+def create_app(storage=None, processor=None, photo_validator=None, spa_dist=None) -> FastAPI:
     built_from_settings = storage is None
     if built_from_settings:
         from .storage import Storage
@@ -62,6 +67,15 @@ def create_app(storage=None, processor=None, photo_validator=None) -> FastAPI:
     @app.get("/api/health")
     def health():
         return {"status": "ok"}
+
+    dist = Path(spa_dist) if spa_dist is not None else _DEFAULT_DIST
+    if dist.is_dir():
+        app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
+
+        # Registered after all API routers so /api/* routes win.
+        @app.get("/{path:path}", include_in_schema=False)
+        def spa(path: str):
+            return FileResponse(dist / "index.html")
 
     return app
 
