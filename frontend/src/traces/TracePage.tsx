@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { api } from "../lib/api";
+import { ApiError, api } from "../lib/api";
 import type { JobDetail } from "../lib/types";
 import { ProcessingView } from "./ProcessingView";
 import { ResultsView } from "./ResultsView";
@@ -10,6 +10,8 @@ export function TracePage() {
   const { data: job, isLoading } = useQuery({
     queryKey: ["job", id],
     queryFn: () => api.get<JobDetail>(`/api/jobs/${id}`),
+    retry: (failureCount, error) =>
+      !(error instanceof ApiError && error.status === 404) && failureCount < 3,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status === "queued" || status === "processing" ? 1500 : false;
