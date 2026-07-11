@@ -74,3 +74,18 @@ def test_save_jpeg_pair(tmp_path):
     save_jpeg_pair(frame, shot, thumb, thumb_width=320)
     assert cv2.imread(str(shot)).shape == (480, 640, 3)
     assert cv2.imread(str(thumb)).shape[1] == 320
+
+
+def test_save_jpeg_pair_creates_divergent_parent_dirs(tmp_path):
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    shot = tmp_path / "shots" / "s.jpg"
+    thumb = tmp_path / "thumbs" / "t.jpg"
+    save_jpeg_pair(frame, shot, thumb)
+    assert shot.exists()
+    assert thumb.exists()
+
+
+def test_annotate_edge_box_keeps_label_on_frame():
+    frame = np.zeros((240, 320, 3), dtype=np.uint8)
+    out = annotate(frame, (250, 10, 318, 235), "Alice - 87%", "#e05252")
+    assert bool(np.any(np.all(out == 255, axis=2))), "label text clipped off-frame"
