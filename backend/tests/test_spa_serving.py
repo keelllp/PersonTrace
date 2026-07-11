@@ -25,6 +25,10 @@ def test_spa_fallback_serves_index_for_client_routes(tmp_path):
     # API routes are untouched by the fallback
     assert client.get("/api/health").json() == {"status": "ok"}
     assert client.get("/api/auth/me").status_code == 401
+    # unknown API paths get a JSON 404, never the SPA page
+    r = client.get("/api/no-such-route")
+    assert r.status_code == 404
+    assert "PersonTrace SPA" not in r.text
 
 
 def test_no_dist_no_spa(tmp_path):

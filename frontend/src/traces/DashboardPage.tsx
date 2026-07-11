@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { api } from "../lib/api";
+import { ApiError, api } from "../lib/api";
 import { formatDate, formatTimecode } from "../lib/format";
 import type { JobListItem } from "../lib/types";
 import { PersonAvatars } from "./PersonAvatars";
@@ -45,6 +45,12 @@ export function DashboardPage() {
   return (
     <div className="max-w-4xl">
       <h1 className="display text-xl mb-6">Traces</h1>
+      {deleteJob.isError && (
+        <p className="text-danger text-sm mb-4">
+          Couldn't delete the trace
+          {deleteJob.error instanceof ApiError ? `: ${deleteJob.error.message}` : " — try again."}
+        </p>
+      )}
       <ul className="space-y-3">
         {jobs.map((job) => (
           <li
@@ -75,7 +81,13 @@ export function DashboardPage() {
                 if (confirm(`Delete trace "${job.video_filename}"? This removes its video, photos, and results.`))
                   deleteJob.mutate(job.id);
               }}
-              className="text-dim hover:text-danger text-sm"
+              disabled={job.status === "processing"}
+              title={
+                job.status === "processing"
+                  ? "Cancel the trace before deleting it"
+                  : undefined
+              }
+              className="text-dim hover:text-danger text-sm disabled:opacity-40 disabled:hover:text-dim"
               aria-label={`Delete trace ${job.video_filename}`}
             >
               Delete
