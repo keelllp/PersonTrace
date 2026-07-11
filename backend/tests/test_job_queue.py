@@ -60,3 +60,16 @@ def test_cancel_flag_reaches_processor_and_marks_cancelled(session_factory):
 
     job = get_job(session_factory, job_id)
     assert job.status == "cancelled"
+
+
+def test_run_does_not_process_cancelled_job(session_factory):
+    job_id = make_job(session_factory)
+    with session_factory() as db:
+        db.get(Job, job_id).status = "cancelled"
+        db.commit()
+    calls = []
+    queue = JobQueue(lambda j, c: calls.append(j), session_factory=session_factory)
+    queue._run(job_id)
+    assert calls == []
+    with session_factory() as db:
+        assert db.get(Job, job_id).status == "cancelled"
