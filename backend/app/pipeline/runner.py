@@ -98,7 +98,12 @@ def run_pipeline(
         # ---- Stage 1: probe ----------------------------------------------
         progress("probe", 0.0)
         video_path = workdir / "video"
-        video_path.write_bytes(storage.get_bytes(job.video_key))
+        try:
+            with open(video_path, "wb") as f:
+                for chunk in storage.stream(job.video_key):
+                    f.write(chunk)
+        except KeyError as exc:
+            raise RuntimeError("Video file is missing from storage") from exc
         info = probe_video(video_path)
         job.duration_s, job.fps = info.duration_s, info.fps
         job.width, job.height = info.width, info.height
@@ -134,20 +139,24 @@ def run_pipeline(
         stride = max(1, round(info.fps / config.SAMPLE_FPS))
         store = TrackletStore(config.CROPS_PER_TRACKLET)
         sampled_total = max(info.frame_count // stride, 1)
-        for n, (index, time_s, frame) in enumerate(iter_frames(video_path, stride)):
-            small, scale = downscale(frame, config.DOWNSCALE_WIDTH)
-            for track_id, box, _conf in models.detector.track(small):
-                x1, y1, x2, y2 = (int(v) for v in box)
-                crop = small[max(y1, 0):y2, max(x1, 0):x2]
-                if not crop.size:
-                    continue
-                original_box = tuple(v * scale for v in box)
-                # crop is downscaled while the box is in original coords; the
-                # resulting score mixes scales but the scale factor is constant
-                # per video, so crop RANKING (all we use) is unaffected.
-                store.add(track_id, time_s, crop, original_box)
-            if n % 10 == 0:
-                progress("detect", n / sampled_total)
+        frames = iter_frames(video_path, stride)
+        try:
+            for n, (index, time_s, frame) in enumerate(frames):
+                small, scale = downscale(frame, config.DOWNSCALE_WIDTH)
+                for track_id, box, _conf in models.detector.track(small):
+                    x1, y1, x2, y2 = (int(v) for v in box)
+                    crop = small[max(y1, 0):y2, max(x1, 0):x2]
+                    if not crop.size:
+                        continue
+                    original_box = tuple(v * scale for v in box)
+                    # crop is downscaled while the box is in original coords; the
+                    # resulting score mixes scales but the scale factor is constant
+                    # per video, so crop RANKING (all we use) is unaffected.
+                    store.add(track_id, time_s, crop, original_box)
+                if n % 10 == 0:
+                    progress("detect", n / sampled_total)
+        finally:
+            frames.close()
         progress("detect", 1.0)
 
         # ---- Stage 4: embed tracklets --------------------------------------
