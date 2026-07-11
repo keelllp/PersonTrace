@@ -4,6 +4,7 @@ import { RequireAuth } from "./auth/RequireAuth";
 import { AppShell } from "./shell/AppShell";
 import { DashboardPage } from "./traces/DashboardPage";
 import { NewTracePage } from "./traces/NewTracePage";
+import { TracePage } from "./traces/TracePage";
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={<DashboardPage />} />
           <Route path="/new" element={<NewTracePage />} />
+          <Route path="/traces/:id" element={<TracePage />} />
         </Route>
       </Route>
     </Routes>
