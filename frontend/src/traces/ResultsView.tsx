@@ -31,12 +31,14 @@ export function ResultsView({ job }: { job: JobDetail }) {
     <div className="max-w-5xl space-y-6">
       <h1 className="display text-xl">{job.video_filename}</h1>
 
+      {/* Cap the player to the viewport (page padding + heading ≈ 12rem) so
+          results open with the full video visible without scrolling. */}
       <video
         ref={videoRef}
         src={results.video.url}
         controls
         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-        className="w-full rounded-lg border border-line bg-black"
+        className="w-full max-h-[calc(100vh-12rem)] object-contain rounded-lg border border-line bg-black"
       />
 
       <Timeline results={results} currentTime={currentTime} onSeek={seek} />
