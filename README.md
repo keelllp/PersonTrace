@@ -14,7 +14,7 @@ Find people in videos. Upload a video and reference photos of one or more people
 - **Frontend:** Vite + React + TypeScript + Tailwind CSS
 - **Infra:** docker-compose (PostgreSQL + SeaweedFS)
 
-## Running the backend
+## Running PersonTrace
 
 ```bash
 docker compose up -d                # Postgres + SeaweedFS (S3)
@@ -24,6 +24,14 @@ uv pip install -r requirements.lock
 alembic upgrade head
 uvicorn app.main:app --port 8000
 ```
+
+### Frontend
+
+Dev (hot reload): `cd frontend && npm install && npm run dev` → http://localhost:5173
+(the dev server proxies `/api` to the backend on :8000).
+
+Production: `cd frontend && npm run build`, then the backend at
+http://localhost:8000 serves the built app directly.
 
 On the first analysis job the pipeline downloads its models (~300 MB total,
 cached afterwards): YOLO11n (~5 MB, to `backend/`), InsightFace buffalo_l
@@ -45,4 +53,4 @@ would require a licensed or self-trained face recognition model.
 
 ## Status
 
-Backend + ML pipeline complete. Frontend (Plan 3) in progress.
+All three phases complete: backend, ML pipeline, and frontend.
