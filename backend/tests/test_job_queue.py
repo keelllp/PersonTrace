@@ -1,0 +1,62 @@
+from app.jobs import JobCancelled, JobQueue
+from app.models import Job, User
+
+
+def make_job(session_factory):
+    with session_factory() as db:
+        user = User(email="q@test.com", password_hash="x")
+        job = Job(user=user, video_key="k", video_filename="v.mp4")
+        db.add(user)
+        db.commit()
+        return job.id
+
+
+def get_job(session_factory, job_id):
+    with session_factory() as db:
+        return db.get(Job, job_id)
+
+
+def test_successful_run_marks_done(session_factory):
+    job_id = make_job(session_factory)
+    calls = []
+
+    def processor(jid, cancel_check):
+        calls.append(jid)
+
+    queue = JobQueue(processor, session_factory=session_factory)
+    queue._run(job_id)
+
+    job = get_job(session_factory, job_id)
+    assert calls == [job_id]
+    assert job.status == "done"
+    assert job.progress_pct == 100.0
+    assert job.finished_at is not None
+
+
+def test_processor_exception_marks_failed_with_error(session_factory):
+    job_id = make_job(session_factory)
+
+    def processor(jid, cancel_check):
+        raise RuntimeError("model exploded")
+
+    queue = JobQueue(processor, session_factory=session_factory)
+    queue._run(job_id)
+
+    job = get_job(session_factory, job_id)
+    assert job.status == "failed"
+    assert "model exploded" in job.error
+
+
+def test_cancel_flag_reaches_processor_and_marks_cancelled(session_factory):
+    job_id = make_job(session_factory)
+
+    def processor(jid, cancel_check):
+        assert cancel_check() is True
+        raise JobCancelled()
+
+    queue = JobQueue(processor, session_factory=session_factory)
+    queue.request_cancel(job_id)
+    queue._run(job_id)
+
+    job = get_job(session_factory, job_id)
+    assert job.status == "cancelled"
