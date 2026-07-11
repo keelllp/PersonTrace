@@ -2,7 +2,7 @@ import json
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 from starlette.datastructures import UploadFile
 
@@ -51,6 +51,7 @@ async def create_job(
 ):
     form = await request.form()
 
+    # Phase 1 — validate everything with NO storage writes.
     video = form.get("video")
     if not isinstance(video, UploadFile):
         raise HTTPException(status_code=422, detail="A video file is required")
@@ -70,17 +71,7 @@ async def create_job(
             status_code=422, detail=f"Between 1 and {MAX_PERSONS} persons required"
         )
 
-    storage = request.app.state.storage
-    validator = request.app.state.photo_validator
-
-    job = Job(user_id=user.id, video_filename=video.filename or "video", video_key="")
-    db.add(job)
-    db.flush()
-
-    job.video_key = job_key(user.id, job.id, f"video{video_ext}")
-    storage.put_bytes(job.video_key, await video.read(), content_type=video.content_type)
-
-    warnings: list[str] = []
+    validated: list[tuple[str, list[UploadFile]]] = []
     for i, meta in enumerate(persons_meta):
         name = (meta.get("name") or "").strip() if isinstance(meta, dict) else ""
         if not name:
@@ -90,28 +81,50 @@ async def create_job(
             raise HTTPException(
                 status_code=422, detail=f"'{name}' needs between 1 and 3 photos"
             )
-
-        person = Person(
-            job_id=job.id, name=name, color=PERSON_COLORS[i % len(PERSON_COLORS)],
-            photo_keys=[],
-        )
-        db.add(person)
-        db.flush()
-
-        keys = []
-        for n, photo in enumerate(photos):
+        for photo in photos:
             ext = os.path.splitext(photo.filename or "")[1].lower()
             if ext not in IMAGE_EXTENSIONS:
                 raise HTTPException(
                     status_code=422, detail=f"Unsupported image type '{ext}' for '{name}'"
                 )
-            data = await photo.read()
-            key = job_key(user.id, job.id, f"persons/{person.id}/photo_{n}{ext}")
-            storage.put_bytes(key, data, content_type=photo.content_type)
-            keys.append(key)
-            if not validator(data):
-                warnings.append(f"No face detected in photo {n + 1} of {name}")
-        person.photo_keys = keys
+        validated.append((name, photos))
+
+    # Phase 2 — persist. Any failure here cleans up whatever storage was written.
+    storage = request.app.state.storage
+    validator = request.app.state.photo_validator
+
+    job = Job(user_id=user.id, video_filename=video.filename or "video", video_key="")
+    db.add(job)
+    db.flush()
+
+    try:
+        job.video_key = job_key(user.id, job.id, f"video{video_ext}")
+        storage.put_bytes(
+            job.video_key, await video.read(), content_type=video.content_type
+        )
+
+        warnings: list[str] = []
+        for i, (name, photos) in enumerate(validated):
+            person = Person(
+                job_id=job.id, name=name, color=PERSON_COLORS[i % len(PERSON_COLORS)],
+                photo_keys=[],
+            )
+            db.add(person)
+            db.flush()
+
+            keys = []
+            for n, photo in enumerate(photos):
+                ext = os.path.splitext(photo.filename or "")[1].lower()
+                data = await photo.read()
+                key = job_key(user.id, job.id, f"persons/{person.id}/photo_{n}{ext}")
+                storage.put_bytes(key, data, content_type=photo.content_type)
+                keys.append(key)
+                if not validator(data):
+                    warnings.append(f"No face detected in photo {n + 1} of {name}")
+            person.photo_keys = keys
+    except Exception:
+        storage.delete_prefix(job_key(user.id, job.id) + "/")
+        raise
 
     db.commit()
     request.app.state.job_queue.submit(job.id)
@@ -139,15 +152,24 @@ def get_job(job: Job = Depends(get_owned_job)):
 
 
 @router.post("/{job_id}/cancel")
-def cancel_job(request: Request, job: Job = Depends(get_owned_job), db: Session = Depends(get_db)):
-    if job.status == "queued":
-        job.status = "cancelled"
-        db.commit()
-    elif job.status == "processing":
+def cancel_job(
+    request: Request,
+    job: Job = Depends(get_owned_job),
+    db: Session = Depends(get_db),
+):
+    claimed = db.execute(
+        update(Job)
+        .where(Job.id == job.id, Job.status == "queued")
+        .values(status="cancelled")
+    )
+    db.commit()
+    if claimed.rowcount:
+        return {"status": "cancelled"}
+    db.refresh(job)
+    if job.status == "processing":
         request.app.state.job_queue.request_cancel(job.id)
-    else:
-        raise HTTPException(status_code=409, detail=f"Job is already {job.status}")
-    return {"status": job.status}
+        return {"status": job.status}
+    raise HTTPException(status_code=409, detail=f"Job is already {job.status}")
 
 
 @router.get("/{job_id}/results", response_model=ResultsOut)
@@ -185,6 +207,8 @@ def delete_job(
     job: Job = Depends(get_owned_job),
     db: Session = Depends(get_db),
 ):
+    if job.status == "processing":
+        raise HTTPException(status_code=409, detail="Cancel the job before deleting it")
     request.app.state.storage.delete_prefix(job_key(job.user_id, job.id) + "/")
     db.delete(job)
     db.commit()
