@@ -89,21 +89,27 @@ def annotate(frame, box_xyxy, label: str, color_hex: str) -> np.ndarray:
 
     font, font_scale = cv2.FONT_HERSHEY_SIMPLEX, max(0.5, out.shape[1] / 1600)
     (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+    frame_h, frame_w = out.shape[:2]
     ty = y1 - 8 if y1 - th - baseline - 8 >= 0 else y2 + th + baseline + 8
+    ty = min(max(ty, th + baseline), frame_h - baseline - 2)
+    bx = min(max(x1, 0), max(frame_w - tw - 8, 0))
     cv2.rectangle(
-        out, (x1, ty - th - baseline), (x1 + tw + 8, ty + baseline), color, -1
+        out, (bx, ty - th - baseline), (bx + tw + 8, ty + baseline), color, -1
     )
     cv2.putText(
-        out, label, (x1 + 4, ty), font, font_scale, (255, 255, 255), thickness,
+        out, label, (bx + 4, ty), font, font_scale, (255, 255, 255), thickness,
         cv2.LINE_AA,
     )
     return out
 
 
 def save_jpeg_pair(frame, screenshot_path, thumbnail_path, thumb_width: int = 320):
-    Path(screenshot_path).parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(screenshot_path), frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    for path in (screenshot_path, thumbnail_path):
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+    if not cv2.imwrite(str(screenshot_path), frame, [cv2.IMWRITE_JPEG_QUALITY, 90]):
+        raise IOError(f"Failed to write screenshot: {screenshot_path}")
     height, width = frame.shape[:2]
     thumb_height = max(1, round(height * thumb_width / width))
     thumb = cv2.resize(frame, (thumb_width, thumb_height), interpolation=cv2.INTER_AREA)
-    cv2.imwrite(str(thumbnail_path), thumb, [cv2.IMWRITE_JPEG_QUALITY, 80])
+    if not cv2.imwrite(str(thumbnail_path), thumb, [cv2.IMWRITE_JPEG_QUALITY, 80]):
+        raise IOError(f"Failed to write thumbnail: {thumbnail_path}")
