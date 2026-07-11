@@ -1,3 +1,7 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+addopts = "-m 'not slow'"
+markers = [
+    "slow: full-pipeline tests with real models (run with: pytest -m slow)",
+]
