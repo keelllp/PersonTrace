@@ -72,6 +72,30 @@ def test_missing_blob_404(auth_client):
     assert client.get(f"/api/media/{job_id}/nope.jpg").status_code == 404
 
 
+def test_path_traversal_segments_404(auth_client, fake_storage):
+    client = auth_client()
+    job_id = create_job(client)["job_id"]
+
+    # The route receives the decoded path (verified: "../other-job/video.mp4"),
+    # but FakeStorage does plain dict lookups on opaque key strings, so a ".."
+    # segment doesn't coincidentally 404 via a missing-key KeyError the way it
+    # would against a real backend that resolves it as "no such object" too —
+    # it also wouldn't 404 if the literal traversal key happens to exist, which
+    # is exactly the scenario a real filer's path resolution could produce.
+    # Plant an object at the literal traversal key so the request would
+    # actually succeed (200) if the guard were not in place, proving the guard
+    # — not an unrelated missing-key 404 — is what blocks this request.
+    put_media(fake_storage, client, job_id, "../secret.mp4", b"leaked-bytes")
+
+    r = client.get(f"/api/media/{job_id}/%2e%2e/secret.mp4")
+    assert r.status_code == 404
+
+    # Doubly-nested traversal segments must also be rejected.
+    put_media(fake_storage, client, job_id, "screenshots/../../secret2.mp4", b"leaked2")
+    r2 = client.get(f"/api/media/{job_id}/screenshots/%2e%2e/%2e%2e/secret2.mp4")
+    assert r2.status_code == 404
+
+
 def test_foreign_job_404(auth_client, client):
     c = auth_client(email="owner2@test.com")
     job_id = create_job(c)["job_id"]
