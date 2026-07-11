@@ -32,7 +32,7 @@ export function AppShell() {
           <p className="truncate" title={user?.email}>{user?.email}</p>
           <button
             onClick={async () => {
-              await logout.mutateAsync();
+              await logout.mutateAsync().catch(() => {});
               navigate("/login");
             }}
             className="hover:text-text"

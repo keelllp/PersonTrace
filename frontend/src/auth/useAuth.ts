@@ -25,7 +25,11 @@ export function useAuth() {
 
   const logout = useMutation({
     mutationFn: () => api.post("/api/auth/logout"),
-    onSuccess: () => queryClient.setQueryData(["me"], null),
+    onSuccess: () => {
+      // Drop every cached query so the next account never sees this one's data.
+      queryClient.clear();
+      queryClient.setQueryData(["me"], null);
+    },
   });
 
   return { user: me.data ?? null, isLoading: me.isLoading, login, register, logout };

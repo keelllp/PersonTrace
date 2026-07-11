@@ -24,6 +24,7 @@ from .storage import job_key
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
+# Keep in sync with PERSON_COLORS in frontend/src/traces/NewTracePage.tsx
 PERSON_COLORS = ["#e05252", "#4f9cf0", "#4fc07a", "#e0a34f", "#a06fe0", "#e05c9c"]
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -52,6 +53,17 @@ async def create_job(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Cheap pre-parse guard: reject bodies that cannot possibly fit the video
+    # cap before request.form() spools the whole upload to temp files. The
+    # allowance above the cap covers reference photos and multipart framing;
+    # the exact per-file check below enforces the real limit.
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > (settings.max_upload_mb + 64) * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Upload exceeds the {settings.max_upload_mb} MB limit",
+        )
+
     form = await request.form()
 
     # Phase 1 — validate everything with NO storage writes.
