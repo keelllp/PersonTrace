@@ -2,6 +2,29 @@ from app.jobs import JobCancelled, JobQueue
 from app.models import Job, User
 
 
+def test_recover_interrupted_jobs_fails_stuck_and_spares_done(session_factory):
+    from app.jobs import recover_interrupted_jobs
+
+    ids = {}
+    with session_factory() as db:
+        user = User(email="r@test.com", password_hash="x")
+        db.add(user)
+        for status in ("processing", "queued", "done"):
+            job = Job(user=user, video_key="k", video_filename="v.mp4", status=status)
+            db.add(job)
+            db.flush()
+            ids[status] = job.id
+        db.commit()
+
+    assert recover_interrupted_jobs(session_factory) == 2
+
+    with session_factory() as db:
+        assert db.get(Job, ids["processing"]).status == "failed"
+        assert db.get(Job, ids["queued"]).status == "failed"
+        assert "restart" in db.get(Job, ids["processing"]).error
+        assert db.get(Job, ids["done"]).status == "done"
+
+
 def make_job(session_factory):
     with session_factory() as db:
         user = User(email="q@test.com", password_hash="x")

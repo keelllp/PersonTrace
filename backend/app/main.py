@@ -1,9 +1,10 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from . import auth, routes_jobs, routes_media
-from .jobs import JobQueue
+from .jobs import JobQueue, recover_interrupted_jobs
 
 
 def _pipeline_unavailable(job_id, cancel_check):
@@ -21,7 +22,13 @@ def create_app(storage=None, processor=None) -> FastAPI:
     async def lifespan(app: FastAPI):
         if built_from_settings:
             storage.ensure_bucket()
+            recovered = recover_interrupted_jobs()
+            if recovered:
+                logging.getLogger(__name__).warning(
+                    "Marked %d interrupted job(s) as failed", recovered
+                )
         yield
+        app.state.job_queue.shutdown()
 
     app = FastAPI(title="PersonTrace API", lifespan=lifespan)
     app.state.storage = storage

@@ -49,6 +49,9 @@ def get_media(
     request: Request,
     job: Job = Depends(get_owned_job),
 ):
+    if path.startswith("/") or ".." in path.split("/"):
+        raise HTTPException(status_code=404, detail="Media not found")
+
     storage = request.app.state.storage
     key = job_key(job.user_id, job.id, path)
     try:
