@@ -132,3 +132,32 @@ def test_delete_job_removes_rows_and_blobs(auth_client, fake_storage, session_fa
     assert all(job_id not in k for k in fake_storage.objects)
     with session_factory() as db:
         assert db.get(Job, job_id) is None
+
+
+def test_failed_create_leaves_no_blobs(auth_client, fake_storage):
+    client = auth_client()
+    files = [
+        ("video", ("c.mp4", b"x", "video/mp4")),
+        ("photos_0", ("p.jpg", b"x", "image/jpeg")),
+        ("photos_0", ("bad.exe", b"x", "application/octet-stream")),
+    ]
+    r = client.post(
+        "/api/jobs", data={"persons": json.dumps([{"name": "A"}])}, files=files
+    )
+    assert r.status_code == 422
+    assert fake_storage.objects == {}
+
+
+def test_delete_processing_job_409(auth_client, session_factory):
+    client = auth_client()
+    job_id = create_job(client)["job_id"]
+    with session_factory() as db:
+        db.get(Job, job_id).status = "processing"
+        db.commit()
+    assert client.delete(f"/api/jobs/{job_id}").status_code == 409
+
+
+def test_cancel_terminal_job_409(auth_client):
+    client = auth_client()
+    job_id = create_job(client)["job_id"]  # inline processor marks it done
+    assert client.post(f"/api/jobs/{job_id}/cancel").status_code == 409

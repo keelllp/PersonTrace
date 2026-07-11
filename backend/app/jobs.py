@@ -5,6 +5,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Callable
 
+from sqlalchemy import update
+
 from .db import SessionLocal
 from .models import Job
 
@@ -39,11 +41,15 @@ class JobQueue:
     def _run(self, job_id: str) -> None:
         db = self._session_factory()
         try:
-            job = db.get(Job, job_id)
-            if job is None or job.status == "cancelled":
-                return
-            job.status = "processing"
+            claimed = db.execute(
+                update(Job)
+                .where(Job.id == job_id, Job.status == "queued")
+                .values(status="processing")
+            )
             db.commit()
+            if claimed.rowcount == 0:
+                return
+            job = db.get(Job, job_id)
 
             try:
                 self._processor(job_id, lambda: self._is_cancelled(job_id))
