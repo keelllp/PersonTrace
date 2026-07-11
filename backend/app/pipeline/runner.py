@@ -217,7 +217,8 @@ def run_pipeline(
                 frame = extract_frame_at(video_path, shot.time_s)
                 if frame is None:
                     continue
-                label = f"{person.name} · {best_match.confidence:.0%}"
+                # ASCII separator only: cv2.putText renders non-ASCII as "?"
+                label = f"{person.name} - {best_match.confidence:.0%}"
                 annotated = annotate(frame, shot.box, label, person.color)
                 shot_path = workdir / f"{person_id}_{si:03d}.jpg"
                 thumb_path = workdir / f"{person_id}_{si:03d}_thumb.jpg"

@@ -62,7 +62,7 @@ def test_extract_frame_at(video_path):
 
 def test_annotate_draws_box_and_label():
     frame = np.zeros((240, 320, 3), dtype=np.uint8)
-    out = annotate(frame, (50, 50, 150, 200), "Alice · 87%", "#e05252")
+    out = annotate(frame, (50, 50, 150, 200), "Alice - 87%", "#e05252")
     assert out is not frame
     assert int(out.sum()) > 0
     assert int(frame.sum()) == 0  # original untouched
