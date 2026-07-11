@@ -1,0 +1,51 @@
+@import "tailwindcss";
+@import "@fontsource-variable/archivo";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+@theme {
+  --color-void: #0f1116;
+  --color-panel: #161a21;
+  --color-panel2: #1c212b;
+  --color-line: #262b36;
+  --color-text: #e9ebf1;
+  --color-dim: #9099ac;
+  --color-signal: #59d4c8;
+  --color-danger: #e05252;
+  --color-ok: #4fc07a;
+
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: "Archivo Variable", ui-sans-serif, sans-serif;
+}
+
+html {
+  background: var(--color-void);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+
+.display {
+  font-family: var(--font-display);
+  font-variation-settings: "wdth" 120;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tc {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-signal) 30%, transparent);
+}
