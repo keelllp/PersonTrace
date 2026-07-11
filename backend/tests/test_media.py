@@ -48,6 +48,24 @@ def test_unsatisfiable_range_416(auth_client):
     assert r.status_code == 416
 
 
+def test_suffix_range(auth_client):
+    client = auth_client()
+    job_id = create_job(client)["job_id"]
+    r = client.get(f"/api/media/{job_id}/video.mp4", headers={"Range": "bytes=-5"})
+    assert r.status_code == 206
+    assert r.content == b"bytes"
+    assert r.headers["content-range"] == "bytes 11-15/16"
+
+
+def test_unsupported_range_syntax_falls_back_to_200(auth_client):
+    client = auth_client()
+    job_id = create_job(client)["job_id"]
+    for header in ("bytes=0-1,4-5", "chars=0-5", "bytes=abc"):
+        r = client.get(f"/api/media/{job_id}/video.mp4", headers={"Range": header})
+        assert r.status_code == 200, header
+        assert r.content == b"fake-video-bytes"
+
+
 def test_missing_blob_404(auth_client):
     client = auth_client()
     job_id = create_job(client)["job_id"]
