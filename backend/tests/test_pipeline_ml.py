@@ -9,6 +9,8 @@ from app.pipeline.ml import (
     get_face_engine,
 )
 
+pytestmark = pytest.mark.models
+
 
 @pytest.fixture(scope="module")
 def astronaut_bgr():

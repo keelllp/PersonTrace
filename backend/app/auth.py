@@ -56,10 +56,11 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
 
 @router.post("/register", status_code=201, response_model=UserOut)
 def register(data: RegisterIn, response: Response, db: Session = Depends(get_db)):
-    existing = db.scalar(select(User).where(User.email == data.email))
+    email = data.email.lower()
+    existing = db.scalar(select(User).where(User.email == email))
     if existing is not None:
         raise HTTPException(status_code=409, detail="Email already registered")
-    user = User(email=data.email, password_hash=hash_password(data.password))
+    user = User(email=email, password_hash=hash_password(data.password))
     db.add(user)
     db.commit()
     _set_session_cookie(response, create_token(user.id))
@@ -68,7 +69,8 @@ def register(data: RegisterIn, response: Response, db: Session = Depends(get_db)
 
 @router.post("/login", response_model=UserOut)
 def login(data: LoginIn, response: Response, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.email == data.email))
+    email = data.email.lower()
+    user = db.scalar(select(User).where(User.email == email))
     if user is None or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     _set_session_cookie(response, create_token(user.id))
