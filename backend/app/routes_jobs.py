@@ -8,12 +8,14 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 
 from .auth import get_current_user
+from .config import settings
 from .db import get_db
 from .models import Job, Person, User
 from .schemas import (
     JobDetail,
     JobListItem,
     PersonOut,
+    PersonSummary,
     ResultsOut,
     SightingOut,
     VideoInfo,
@@ -63,6 +65,15 @@ async def create_job(
             detail=f"Unsupported video type '{video_ext}'. Allowed: {sorted(VIDEO_EXTENSIONS)}",
         )
 
+    video.file.seek(0, 2)
+    video_size = video.file.tell()
+    video.file.seek(0)
+    if video_size > settings.max_upload_mb * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Video exceeds the {settings.max_upload_mb} MB limit",
+        )
+
     try:
         persons_meta = json.loads(form.get("persons") or "")
     except (json.JSONDecodeError, TypeError):
@@ -100,9 +111,7 @@ async def create_job(
 
     try:
         job.video_key = job_key(user.id, job.id, f"video{video_ext}")
-        storage.put_bytes(
-            job.video_key, await video.read(), content_type=video.content_type
-        )
+        storage.put_fileobj(job.video_key, video.file, content_type=video.content_type)
 
         warnings: list[str] = []
         for i, (name, photos) in enumerate(validated):
@@ -140,8 +149,14 @@ def list_jobs(user: User = Depends(get_current_user), db: Session = Depends(get_
     return [
         JobListItem(
             id=j.id, video_filename=j.video_filename, status=j.status, stage=j.stage,
-            progress_pct=j.progress_pct, created_at=j.created_at,
-            person_names=[p.name for p in j.persons],
+            progress_pct=j.progress_pct, created_at=j.created_at, duration_s=j.duration_s,
+            persons=[
+                PersonSummary(
+                    id=p.id, name=p.name, color=p.color,
+                    photo_url=_media_url(j, p.photo_keys[0]) if p.photo_keys else None,
+                )
+                for p in j.persons
+            ],
         )
         for j in jobs
     ]
@@ -169,7 +184,7 @@ def cancel_job(
     db.refresh(job)
     if job.status == "processing":
         request.app.state.job_queue.request_cancel(job.id)
-        return {"status": job.status}
+        return {"status": "cancelling"}
     raise HTTPException(status_code=409, detail=f"Job is already {job.status}")
 
 

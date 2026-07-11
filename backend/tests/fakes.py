@@ -10,6 +10,9 @@ class FakeStorage:
     def put_bytes(self, key, data, content_type=None):
         self.objects[key] = bytes(data)
 
+    def put_fileobj(self, key, fileobj, content_type=None):
+        self.objects[key] = fileobj.read()
+
     def get_bytes(self, key):
         if key not in self.objects:
             raise KeyError(key)
