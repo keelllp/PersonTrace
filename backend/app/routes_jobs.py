@@ -4,6 +4,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 
 from .auth import get_current_user
@@ -119,7 +120,7 @@ async def create_job(
                 key = job_key(user.id, job.id, f"persons/{person.id}/photo_{n}{ext}")
                 storage.put_bytes(key, data, content_type=photo.content_type)
                 keys.append(key)
-                if not validator(data):
+                if not await run_in_threadpool(validator, data):
                     warnings.append(f"No face detected in photo {n + 1} of {name}")
             person.photo_keys = keys
     except Exception:
