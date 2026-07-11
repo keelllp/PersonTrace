@@ -49,3 +49,24 @@ html {
 ::selection {
   background: color-mix(in srgb, var(--color-signal) 30%, transparent);
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes scan {
+    from {
+      background-position: -200% 0;
+    }
+    to {
+      background-position: 200% 0;
+    }
+  }
+  .scanning {
+    background-image: linear-gradient(
+      90deg,
+      transparent 30%,
+      color-mix(in srgb, var(--color-signal) 25%, transparent) 50%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    animation: scan 2.4s linear infinite;
+  }
+}
