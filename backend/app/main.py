@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from . import auth, routes_jobs
+from . import auth, routes_jobs, routes_media
 from .jobs import JobQueue
 
 
@@ -30,6 +30,7 @@ def create_app(storage=None, processor=None) -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(routes_jobs.router)
+    app.include_router(routes_media.router)
 
     @app.get("/api/health")
     def health():
