@@ -8,6 +8,8 @@ from app.db import get_db
 from app.main import create_app
 from app.models import Base
 
+from .fakes import FakeStorage
+
 
 @pytest.fixture()
 def session_factory():
@@ -19,8 +21,22 @@ def session_factory():
 
 
 @pytest.fixture()
-def app(session_factory):
-    application = create_app()
+def fake_storage():
+    return FakeStorage()
+
+
+@pytest.fixture()
+def processor_calls():
+    return []
+
+
+@pytest.fixture()
+def app(session_factory, fake_storage, processor_calls):
+    def processor(job_id, cancel_check):
+        processor_calls.append(job_id)
+
+    application = create_app(storage=fake_storage, processor=processor)
+    application.state.job_queue._session_factory = session_factory
 
     def override_get_db():
         db = session_factory()
@@ -30,6 +46,7 @@ def app(session_factory):
             db.close()
 
     application.dependency_overrides[get_db] = override_get_db
+    application.state.job_queue.submit = application.state.job_queue._run
     return application
 
 
