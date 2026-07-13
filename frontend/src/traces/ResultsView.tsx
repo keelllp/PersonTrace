@@ -29,19 +29,25 @@ export function ResultsView({ job }: { job: JobDetail }) {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <h1 className="display text-xl">{job.video_filename}</h1>
+      {/* Size heading + video + timeline to the viewport (minus the shell's
+          padding and, below md, the top bar) so results open with the video
+          AND the scrubber visible without scrolling. The timeline grows with
+          person count, so the video flexes to whatever space remains. */}
+      <div className="flex flex-col gap-4 h-[calc(100dvh-6rem)] md:h-[calc(100vh-4rem)]">
+        <h1 className="display text-xl shrink-0">{job.video_filename}</h1>
 
-      {/* Cap the player to the viewport (page padding + heading ≈ 12rem) so
-          results open with the full video visible without scrolling. */}
-      <video
-        ref={videoRef}
-        src={results.video.url}
-        controls
-        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-        className="w-full max-h-[calc(100vh-12rem)] object-contain rounded-lg border border-line bg-black"
-      />
+        <video
+          ref={videoRef}
+          src={results.video.url}
+          controls
+          onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+          className="w-full flex-1 min-h-0 object-contain rounded-lg border border-line bg-black"
+        />
 
-      <Timeline results={results} currentTime={currentTime} onSeek={seek} />
+        <div className="shrink-0">
+          <Timeline results={results} currentTime={currentTime} onSeek={seek} />
+        </div>
+      </div>
 
       {notFound.length > 0 && (
         <div className="bg-panel border border-line rounded-lg p-4 text-sm text-dim">
